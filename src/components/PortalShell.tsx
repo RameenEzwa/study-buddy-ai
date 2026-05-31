@@ -1,4 +1,4 @@
-import { Link, Outlet, useNavigate } from "@tanstack/react-router";
+import { Link, useNavigate } from "@tanstack/react-router";
 import { useAuth, type Role } from "@/lib/auth";
 import { Button } from "@/components/ui/button";
 import { LogOut, GraduationCap, Shield, Users } from "lucide-react";
