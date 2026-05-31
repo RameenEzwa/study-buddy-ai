@@ -1,11 +1,11 @@
 """
 AI Student Performance Assistant — Streamlit Edition
-Supports UN SDG 4 (Quality Education) and aligns with Vision 2030 / 2035.
+Supports UN SDG 4 (Quality Education) · aligned with Vision 2030 / 2035.
 
-A clean, role-based AI educational platform with three portals:
-  • Student Portal  — AI predictions & personalized recommendations
-  • Admin Portal    — dataset management, ML monitoring, system analytics
-  • Teacher Portal  — school analytics, at-risk students, SDG 4 reports
+Secure single-entry login with role-based access control (RBAC):
+  • admin   / admin123    → Admin Portal   (full system authority)
+  • teacher / teacher123  → Teacher Portal (educational decision-making)
+  • student / student123  → Student Portal (personal learning guidance)
 
 Dataset: Kaggle — "Student Performance Factors"
 https://www.kaggle.com/datasets/lainguyn123/student-performance-factors
@@ -14,7 +14,6 @@ https://www.kaggle.com/datasets/lainguyn123/student-performance-factors
 import os
 import streamlit as st
 import pandas as pd
-import numpy as np
 import plotly.express as px
 import plotly.graph_objects as go
 
@@ -24,6 +23,36 @@ from sklearn.model_selection import train_test_split
 from sklearn.metrics import mean_absolute_error, accuracy_score, r2_score
 
 DATA_FILE = "StudentPerformanceFactors.csv"
+
+# ---------------------------------------------------------------------------
+# Demo credentials (for presentation only — replace with real auth in prod)
+# ---------------------------------------------------------------------------
+CREDENTIALS = {
+    "admin":   {"password": "admin123",   "role": "admin",   "name": "System Admin"},
+    "teacher": {"password": "teacher123", "role": "teacher", "name": "Ms. Teacher"},
+    "student": {"password": "student123", "role": "student", "name": "Student User"},
+}
+
+ROLE_PERMISSIONS = {
+    "admin": {
+        "reload_data", "view_raw_data", "data_health",
+        "retrain_models", "view_model_metrics", "system_analytics",
+    },
+    "teacher": {
+        "weak_students", "school_analytics", "sdg_report",
+        "average_scores", "performance_trends",
+    },
+    "student": {
+        "ai_prediction", "study_recommendations",
+        "ai_chatbot", "personal_insights",
+    },
+}
+
+
+def can(permission: str) -> bool:
+    role = st.session_state.get("role")
+    return bool(role) and permission in ROLE_PERMISSIONS.get(role, set())
+
 
 # ---------------------------------------------------------------------------
 # Page configuration & global styles
@@ -38,46 +67,34 @@ st.set_page_config(
 st.markdown(
     """
     <style>
-      /* hide default streamlit chrome for a cleaner SaaS feel */
-      #MainMenu {visibility: hidden;}
-      footer {visibility: hidden;}
-
-      .hero {
-        text-align: center;
-        padding: 3rem 1rem 2rem 1rem;
-      }
-      .hero h1 {
-        font-size: 3rem;
-        font-weight: 800;
+      #MainMenu, footer {visibility: hidden;}
+      .login-hero h1 {
+        font-size: 2.4rem; font-weight: 800;
         background: linear-gradient(90deg, #4F8EF7, #34A853);
-        -webkit-background-clip: text;
-        -webkit-text-fill-color: transparent;
-        margin-bottom: 0.5rem;
+        -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+        margin-bottom: 0.2rem;
       }
-      .hero p { font-size: 1.1rem; color: #555; max-width: 720px; margin: 0 auto;}
-      .portal-card {
-        background: linear-gradient(135deg, #ffffff, #f5f8ff);
-        border: 1px solid #e6ecf5;
-        border-radius: 16px;
-        padding: 1.75rem 1.5rem;
-        text-align: center;
-        box-shadow: 0 4px 18px rgba(80,110,180,0.08);
-        height: 100%;
-      }
-      .portal-card h3 { margin: 0.5rem 0 0.4rem 0; }
-      .portal-card p  { color: #5a6477; min-height: 60px; }
+      .login-hero p { color:#5a6477; }
       .pill {
         display:inline-block; padding:4px 12px; border-radius:999px;
-        background:#eef3ff; color:#3056d3; font-size:0.8rem; font-weight:600;
+        background:#eef3ff; color:#3056d3; font-size:0.78rem; font-weight:600;
         margin: 2px;
-      }
-      .section-title {
-        font-size: 1.4rem; font-weight: 700; margin: 1rem 0 0.5rem 0;
       }
       .ai-insight {
         background: linear-gradient(135deg, #eef7ff, #f3fff0);
         border-left: 4px solid #4F8EF7;
         padding: 1rem 1.2rem; border-radius: 8px; margin: 0.6rem 0;
+      }
+      .role-badge {
+        display:inline-block; padding:4px 10px; border-radius:6px;
+        font-size:0.75rem; font-weight:700; letter-spacing:0.5px;
+      }
+      .badge-admin   { background:#fde7e7; color:#b42318; }
+      .badge-teacher { background:#e6f4ea; color:#1e7e34; }
+      .badge-student { background:#e8f0ff; color:#1d4ed8; }
+      .vision-card {
+        background:#f7faff; border:1px solid #e3ebf7; border-radius:12px;
+        padding:1rem 1.2rem; height:100%;
       }
     </style>
     """,
@@ -86,7 +103,7 @@ st.markdown(
 
 
 # ---------------------------------------------------------------------------
-# Data loading & ML training (cached)
+# Data loading & ML (cached)
 # ---------------------------------------------------------------------------
 @st.cache_data(show_spinner=False)
 def load_data(path: str = DATA_FILE) -> pd.DataFrame:
@@ -112,255 +129,200 @@ def train_regression(df: pd.DataFrame):
 
 @st.cache_resource(show_spinner=False)
 def train_classifier(df: pd.DataFrame):
-    def categorize(score: float) -> str:
-        if score < 60: return "Low"
-        if score < 80: return "Medium"
-        return "High"
-
+    def categorize(s): return "Low" if s < 60 else ("Medium" if s < 80 else "High")
     data = df.copy()
     data["Category"] = data["Exam_Score"].apply(categorize)
-    features = ["Hours_Studied", "Attendance", "Previous_Scores",
-                "Sleep_Hours", "Tutoring_Sessions"]
-    X = data[features]
-    y = data["Category"]
+    feats = ["Hours_Studied", "Attendance", "Previous_Scores",
+             "Sleep_Hours", "Tutoring_Sessions"]
+    X, y = data[feats], data["Category"]
     Xtr, Xte, ytr, yte = train_test_split(X, y, test_size=0.2, random_state=42)
     clf = RandomForestClassifier(n_estimators=120, random_state=42).fit(Xtr, ytr)
-    acc = accuracy_score(yte, clf.predict(Xte))
-    return clf, float(acc), features
+    return clf, float(accuracy_score(yte, clf.predict(Xte))), feats
 
 
-# ---------------------------------------------------------------------------
-# Mock LMSYS / LM Arena AI insight wrapper
-# ---------------------------------------------------------------------------
-def ai_insight(prompt: str, score: float | None = None) -> str:
+def ai_insight(score: float | None = None) -> str:
     """
     Mock wrapper around an LLM API (e.g., LMSYS / LM Arena).
-    In production this would call the real endpoint:
-
-        response = requests.post(
-            "https://api.lmarena.ai/v1/chat/completions",
-            headers={"Authorization": f"Bearer {API_KEY}"},
-            json={"model": "gpt-4o-mini",
-                  "messages": [{"role": "user", "content": prompt}]},
-        )
-        return response.json()["choices"][0]["message"]["content"]
-
-    For demo purposes we return deterministic, rule-based insights.
+    In production this would call:
+        requests.post("https://api.lmarena.ai/v1/chat/completions",
+                      headers={"Authorization": f"Bearer {API_KEY}"}, ...)
     """
     if score is None:
-        return "AI assistant ready. Ask about your study plan or performance."
+        return "AI assistant ready."
     if score < 50:
-        return ("⚠️ The AI detects a high risk of underperformance. "
-                "Prioritize attendance, build a 20+ hour weekly study schedule, "
-                "and seek tutoring support on weak topics.")
+        return ("⚠️ High risk of underperformance. Prioritize attendance, build a "
+                "20+ hour weekly study schedule, and seek tutoring on weak topics.")
     if score < 75:
-        return ("📈 You're on a solid path. The AI suggests deliberate practice "
-                "with past exam questions and forming a small study group "
-                "to push into the high-performing band.")
-    return ("🌟 Excellent trajectory! The AI recommends mentoring peers and "
-            "exploring advanced material to sustain mastery.")
+        return ("📈 You're on a solid path. Practice past exam questions and form a "
+                "small study group to break into the high-performing band.")
+    return ("🌟 Excellent trajectory! Mentor peers and explore advanced material "
+            "to sustain mastery.")
 
 
 # ---------------------------------------------------------------------------
-# Session state helpers
+# Auth
 # ---------------------------------------------------------------------------
 def init_state():
-    st.session_state.setdefault("portal", None)   # None | student | admin | teacher
-    st.session_state.setdefault("user", None)
+    st.session_state.setdefault("logged_in", False)
+    st.session_state.setdefault("role", None)
+    st.session_state.setdefault("username", None)
+    st.session_state.setdefault("display_name", None)
 
 
-def go_to(portal: str | None):
-    st.session_state.portal = portal
-    if portal is None:
-        st.session_state.user = None
+def logout():
+    for k in ("logged_in", "role", "username", "display_name"):
+        st.session_state[k] = False if k == "logged_in" else None
 
 
-# ---------------------------------------------------------------------------
-# Landing page
-# ---------------------------------------------------------------------------
-def landing_page():
-    st.markdown(
-        """
-        <div class="hero">
-          <h1>🎓 AI Student Performance Assistant</h1>
-          <p>
-            An AI-powered educational platform supporting
-            <b>UN SDG 4 — Quality Education</b> and aligned with
-            <b>Vision 2030</b> &amp; <b>Vision 2035</b> for a smarter,
-            data-driven learning future.
-          </p>
-          <div style="margin-top:1rem">
-            <span class="pill">SDG 4</span>
-            <span class="pill">Vision 2030</span>
-            <span class="pill">Vision 2035</span>
-            <span class="pill">AI · Machine Learning</span>
-          </div>
-        </div>
-        """,
-        unsafe_allow_html=True,
-    )
-
-    st.write("")
-    c1, c2, c3 = st.columns(3, gap="large")
-
-    with c1:
+def login_page():
+    left, center, right = st.columns([1, 2, 1])
+    with center:
         st.markdown(
-            '<div class="portal-card">'
-            '<div style="font-size:2.4rem">👩‍🎓</div>'
-            '<h3>Student Portal</h3>'
-            '<p>Get AI-powered exam predictions and personalized study guidance.</p>'
-            '</div>',
+            """
+            <div class="login-hero" style="text-align:center; padding: 2rem 0 1rem 0;">
+              <div style="font-size:3rem;">🎓</div>
+              <h1>AI Student Performance Assistant</h1>
+              <p>Secure sign-in to your educational AI workspace</p>
+              <div>
+                <span class="pill">SDG 4</span>
+                <span class="pill">Vision 2030</span>
+                <span class="pill">Vision 2035</span>
+              </div>
+            </div>
+            """,
             unsafe_allow_html=True,
         )
-        if st.button("Enter Student Portal", use_container_width=True, key="b_student"):
-            go_to("student"); st.rerun()
-
-    with c2:
-        st.markdown(
-            '<div class="portal-card">'
-            '<div style="font-size:2.4rem">🛠️</div>'
-            '<h3>Admin Portal</h3>'
-            '<p>Manage the dataset, monitor ML models, and check system health.</p>'
-            '</div>',
-            unsafe_allow_html=True,
-        )
-        if st.button("Enter Admin Portal", use_container_width=True, key="b_admin"):
-            go_to("admin"); st.rerun()
-
-    with c3:
-        st.markdown(
-            '<div class="portal-card">'
-            '<div style="font-size:2.4rem">🏫</div>'
-            '<h3>Teacher Portal</h3>'
-            '<p>Track at-risk students, school analytics, and SDG 4 progress.</p>'
-            '</div>',
-            unsafe_allow_html=True,
-        )
-        if st.button("Enter Teacher Portal", use_container_width=True, key="b_teacher"):
-            go_to("teacher"); st.rerun()
-
-
-# ---------------------------------------------------------------------------
-# Sidebar (only inside portals)
-# ---------------------------------------------------------------------------
-def portal_sidebar(role_label: str):
-    with st.sidebar:
-        st.markdown(f"### 👤 {st.session_state.user or 'Guest'}")
-        st.caption(f"Signed in to **{role_label}**")
-        st.divider()
-        if st.button("🏠 Back to Home", use_container_width=True):
-            go_to(None); st.rerun()
-        if st.button("🚪 Logout", use_container_width=True):
-            go_to(None); st.rerun()
-        st.divider()
-        with st.expander("Help"):
-            st.write("Need help? Contact your platform admin or open the README "
-                     "for documentation on each portal.")
-
-
-# ---------------------------------------------------------------------------
-# Student Portal
-# ---------------------------------------------------------------------------
-def student_portal(df: pd.DataFrame):
-    if not st.session_state.user:
-        st.markdown("## 👩‍🎓 Student Login")
         with st.container(border=True):
-            name = st.text_input("Enter your name", placeholder="e.g., Alex")
-            col1, col2 = st.columns([1, 1])
-            if col1.button("Sign in", type="primary", use_container_width=True):
-                if name.strip():
-                    st.session_state.user = name.strip()
+            st.markdown("### 🔐 Sign in")
+            with st.form("login_form", clear_on_submit=False):
+                username = st.text_input("Username", max_chars=50)
+                password = st.text_input("Password", type="password", max_chars=100)
+                submitted = st.form_submit_button("Sign in", type="primary",
+                                                  use_container_width=True)
+            if submitted:
+                u = (username or "").strip().lower()
+                p = (password or "").strip()
+                user = CREDENTIALS.get(u)
+                if user and user["password"] == p:
+                    st.session_state.logged_in = True
+                    st.session_state.username = u
+                    st.session_state.role = user["role"]
+                    st.session_state.display_name = user["name"]
+                    st.success(f"Welcome, {user['name']}! Redirecting…")
                     st.rerun()
                 else:
-                    st.warning("Please enter your name.")
-            if col2.button("Back", use_container_width=True):
-                go_to(None); st.rerun()
-        return
+                    st.error("Invalid username or password.")
 
-    portal_sidebar("Student Portal")
-    st.markdown(f"## 👋 Welcome, {st.session_state.user}")
-    st.caption("Your personal AI learning assistant")
+
+# ---------------------------------------------------------------------------
+# Sidebar (post-login only)
+# ---------------------------------------------------------------------------
+def render_sidebar():
+    role = st.session_state.role
+    badge_class = f"badge-{role}"
+    with st.sidebar:
+        st.markdown(f"### 👤 {st.session_state.display_name}")
+        st.markdown(
+            f'<span class="role-badge {badge_class}">{role.upper()} ROLE</span>',
+            unsafe_allow_html=True,
+        )
+        st.caption(f"Signed in as `{st.session_state.username}`")
+        st.divider()
+        if st.button("🚪 Log Out", use_container_width=True):
+            logout(); st.rerun()
+        st.divider()
+        with st.expander("Help"):
+            st.write("Each role has different permissions. Contact your "
+                     "administrator if you need elevated access.")
+
+
+# ---------------------------------------------------------------------------
+# Student Portal — guidance-focused (no raw data, no system tools)
+# ---------------------------------------------------------------------------
+def student_portal(df: pd.DataFrame):
+    st.markdown(
+        f"## 👩‍🎓 Welcome, {st.session_state.display_name}"
+    )
+    st.caption("Your personal AI learning assistant — guidance, predictions, and motivation.")
 
     model, metrics = train_regression(df)
-
-    tab1, tab2, tab3 = st.tabs(["🔮 Predict Score", "💡 Recommendations", "🤖 AI Assistant"])
+    tab1, tab2, tab3, tab4 = st.tabs(
+        ["🔮 AI Prediction", "💡 Recommendations", "🤖 AI Chatbot", "✨ My Insights"]
+    )
 
     with tab1:
+        if not can("ai_prediction"):
+            st.warning("You don't have access to this feature."); return
         st.markdown("#### Predict your exam score")
         hours = st.slider("Study hours per week", 0.0, 50.0, 15.0, 0.5)
         pred = float(model.predict(pd.DataFrame({"Hours_Studied": [hours]}))[0])
         pred = max(0.0, min(100.0, pred))
-
-        c1, c2, c3 = st.columns(3)
-        c1.metric("Predicted score", f"{pred:.1f} / 100")
-        c2.metric("Model MAE", f"{metrics['mae']:.2f}")
-        c3.metric("Model R²", f"{metrics['r2']:.2f}")
-
+        st.metric("Predicted score", f"{pred:.1f} / 100")
         gauge = go.Figure(go.Indicator(
-            mode="gauge+number",
-            value=pred,
-            title={"text": "Predicted Exam Score"},
-            gauge={"axis": {"range": [0, 100]},
-                   "bar": {"color": "#4F8EF7"},
-                   "steps": [
-                       {"range": [0, 50], "color": "#ffe0e0"},
-                       {"range": [50, 75], "color": "#fff4cc"},
-                       {"range": [75, 100], "color": "#dff5e1"}]}))
-        gauge.update_layout(height=300, margin=dict(t=40, b=10))
+            mode="gauge+number", value=pred,
+            gauge={"axis": {"range": [0, 100]}, "bar": {"color": "#4F8EF7"},
+                   "steps": [{"range": [0, 50], "color": "#ffe0e0"},
+                             {"range": [50, 75], "color": "#fff4cc"},
+                             {"range": [75, 100], "color": "#dff5e1"}]}))
+        gauge.update_layout(height=280, margin=dict(t=20, b=10))
         st.plotly_chart(gauge, use_container_width=True)
+        st.caption("🔒 Model metrics are restricted to administrators.")
 
     with tab2:
-        st.markdown("#### Personalized Recommendations")
+        if not can("study_recommendations"):
+            st.warning("You don't have access to this feature."); return
         score = st.number_input("Your current average score", 0.0, 100.0, 65.0, 1.0)
         if score < 50:
-            tips = ["Study at least 20 hrs/week",
-                    "Attend every class — attendance matters",
-                    "Ask teachers for help on weak topics",
-                    "Sleep 7–8 hours nightly"]
-            level = "🚨 At Risk"
+            level, tips = "🚨 At Risk", [
+                "Study at least 20 hrs/week",
+                "Attend every class — attendance matters",
+                "Ask teachers for help on weak topics",
+                "Sleep 7–8 hours nightly"]
         elif score < 75:
-            tips = ["Aim for 25+ focused hours weekly",
-                    "Practice past exam papers",
-                    "Form a small study group",
-                    "Balance study with light exercise"]
-            level = "📈 On Track"
+            level, tips = "📈 On Track", [
+                "Aim for 25+ focused hours weekly",
+                "Practice past exam papers",
+                "Form a small study group",
+                "Balance study with light exercise"]
         else:
-            tips = ["Maintain your strong routine",
-                    "Mentor a peer — teaching deepens mastery",
-                    "Challenge yourself with advanced material",
-                    "Keep a healthy study–rest balance"]
-            level = "🌟 Excelling"
-
+            level, tips = "🌟 Excelling", [
+                "Maintain your strong routine",
+                "Mentor a peer — teaching deepens mastery",
+                "Challenge yourself with advanced material",
+                "Keep a healthy study–rest balance"]
         st.metric("Performance status", level)
-        for t in tips:
-            st.markdown(f"- {t}")
+        for t in tips: st.markdown(f"- {t}")
 
     with tab3:
-        st.markdown("#### AI Learning Assistant")
+        if not can("ai_chatbot"):
+            st.warning("You don't have access to this feature."); return
+        st.markdown("#### AI Learning Chatbot")
         score = st.slider("Tell the AI your current score", 0, 100, 65, key="ai_score")
-        st.markdown(f'<div class="ai-insight">{ai_insight("student", score)}</div>',
+        st.markdown(f'<div class="ai-insight">{ai_insight(score)}</div>',
                     unsafe_allow_html=True)
-        st.caption("Powered by a mock LMSYS / LM Arena integration (see code comments).")
+        st.caption("Powered by a mock LMSYS / LM Arena integration.")
+
+    with tab4:
+        if not can("personal_insights"):
+            st.warning("You don't have access to this feature."); return
+        st.markdown("#### Your Personal Motivation Dashboard")
+        c1, c2, c3 = st.columns(3)
+        c1.metric("Weekly goal", "25 hrs", "+5 hrs")
+        c2.metric("Target score", "85", "+10")
+        c3.metric("Streak", "7 days", "+1")
+        st.info("💪 Keep going! Consistency beats intensity. Vision 2030 starts "
+                "with one focused study session at a time.")
 
 
 # ---------------------------------------------------------------------------
-# Admin Portal
+# Admin Portal — full system authority
 # ---------------------------------------------------------------------------
 def admin_portal(df: pd.DataFrame):
-    if not st.session_state.user:
-        st.markdown("## 🛠️ Admin Login")
-        with st.container(border=True):
-            name = st.text_input("Admin username", value="admin")
-            col1, col2 = st.columns(2)
-            if col1.button("Sign in", type="primary", use_container_width=True):
-                st.session_state.user = name.strip() or "admin"
-                st.rerun()
-            if col2.button("Back", use_container_width=True):
-                go_to(None); st.rerun()
-        return
-
-    portal_sidebar("Admin Portal")
-    st.markdown("## 🛠️ Admin Dashboard")
+    st.markdown("## 🛠️ Admin Control Center")
+    st.markdown(
+        '<span class="role-badge badge-admin">🔒 ADMIN ACCESS ONLY</span>',
+        unsafe_allow_html=True,
+    )
     st.caption("System monitoring · dataset management · ML operations")
 
     c1, c2, c3, c4 = st.columns(4)
@@ -374,41 +336,45 @@ def admin_portal(df: pd.DataFrame):
     )
 
     with tab1:
-        st.markdown("#### Full Dataset Viewer")
+        if not (can("view_raw_data") and can("reload_data")):
+            st.error("🔒 Admin Access Only"); return
+        st.markdown("#### Raw Dataframe Viewer  🔒 *Admin Access Only*")
         if st.button("🔄 Reload dataset"):
-            load_data.clear()
-            st.rerun()
+            load_data.clear(); st.rerun()
         st.dataframe(df, use_container_width=True, height=400)
         st.markdown("#### Numeric Summary")
         st.dataframe(df.describe().round(2), use_container_width=True)
 
     with tab2:
-        st.markdown("#### Missing Value Analysis")
+        if not can("data_health"):
+            st.error("🔒 Admin Access Only"); return
+        st.markdown("#### Missing Value Analysis  🔒 *Admin Access Only*")
         missing = df.isna().sum().reset_index()
         missing.columns = ["Column", "Missing"]
         fig = px.bar(missing, x="Column", y="Missing",
-                     title="Missing values per column", color="Missing",
-                     color_continuous_scale="Reds")
+                     color="Missing", color_continuous_scale="Reds",
+                     title="Missing values per column")
         st.plotly_chart(fig, use_container_width=True)
         st.success("✅ Data health check completed.")
 
     with tab3:
-        st.markdown("#### Model Training & Metrics")
+        if not (can("retrain_models") and can("view_model_metrics")):
+            st.error("🔒 Admin Access Only"); return
+        st.markdown("#### Model Training & Metrics  🔒 *Admin Access Only*")
         with st.spinner("Training models..."):
-            _, reg_metrics = train_regression(df)
-            _, clf_acc, feats = train_classifier(df)
-
+            _, reg = train_regression(df)
+            _, acc, feats = train_classifier(df)
         c1, c2, c3 = st.columns(3)
-        c1.metric("Regression MAE", f"{reg_metrics['mae']:.2f}")
-        c2.metric("Regression R²", f"{reg_metrics['r2']:.2f}")
-        c3.metric("Classifier accuracy", f"{clf_acc*100:.1f}%")
-
+        c1.metric("Regression MAE", f"{reg['mae']:.2f}")
+        c2.metric("Regression R²", f"{reg['r2']:.2f}")
+        c3.metric("Classifier accuracy", f"{acc*100:.1f}%")
         st.markdown("**Classifier features:** " + ", ".join(feats))
         if st.button("🔁 Retrain models"):
-            train_regression.clear(); train_classifier.clear()
-            st.rerun()
+            train_regression.clear(); train_classifier.clear(); st.rerun()
 
     with tab4:
+        if not can("system_analytics"):
+            st.error("🔒 Admin Access Only"); return
         st.markdown("#### Kaggle Dataset Hosting")
         st.info(
             "**Dataset:** Student Performance Factors  \n"
@@ -416,31 +382,23 @@ def admin_portal(df: pd.DataFrame):
             f"**Local file:** `{DATA_FILE}`"
         )
         st.markdown("#### System Stack")
-        st.markdown("- Python · Streamlit · Plotly\n- pandas · NumPy · scikit-learn\n- Mock LMSYS / LM Arena API wrapper")
+        st.markdown("- Python · Streamlit · Plotly\n"
+                    "- pandas · NumPy · scikit-learn\n"
+                    "- Mock LMSYS / LM Arena API wrapper")
+        st.markdown("#### RBAC Status")
+        st.json({role: sorted(list(perms)) for role, perms in ROLE_PERMISSIONS.items()})
 
 
 # ---------------------------------------------------------------------------
-# Teacher Portal
+# Teacher Portal — educational decision-making
 # ---------------------------------------------------------------------------
 def teacher_portal(df: pd.DataFrame):
-    if not st.session_state.user:
-        st.markdown("## 🏫 Teacher Login")
-        with st.container(border=True):
-            name = st.text_input("Teacher name", placeholder="e.g., Ms. Khan")
-            col1, col2 = st.columns(2)
-            if col1.button("Sign in", type="primary", use_container_width=True):
-                if name.strip():
-                    st.session_state.user = name.strip()
-                    st.rerun()
-                else:
-                    st.warning("Please enter your name.")
-            if col2.button("Back", use_container_width=True):
-                go_to(None); st.rerun()
-        return
-
-    portal_sidebar("Teacher Portal")
-    st.markdown(f"## 🏫 School Analytics — {st.session_state.user}")
-    st.caption("High-level insights for decision makers")
+    st.markdown(f"## 🏫 Teacher Dashboard — {st.session_state.display_name}")
+    st.markdown(
+        '<span class="role-badge badge-teacher">EDUCATIONAL MANAGEMENT</span>',
+        unsafe_allow_html=True,
+    )
+    st.caption("High-level insights for educators and decision-makers")
 
     avg = df["Exam_Score"].mean()
     weak = df[df["Exam_Score"] < 60]
@@ -453,35 +411,42 @@ def teacher_portal(df: pd.DataFrame):
     c3.metric("Total students", f"{len(df):,}")
     c4.metric("SDG 4 index", f"{min(100, avg*1.05):.1f}%")
 
-    tab1, tab2, tab3 = st.tabs(["📊 Analytics", "⚠️ At-Risk", "🌍 SDG 4 Report"])
+    tab1, tab2, tab3, tab4 = st.tabs(
+        ["📊 Analytics", "⚠️ At-Risk", "🌍 SDG 4 Report", "🎯 Vision Impact"]
+    )
 
     with tab1:
+        if not can("school_analytics"):
+            st.warning("You don't have access to this feature."); return
         c1, c2 = st.columns(2)
         with c1:
-            fig = px.histogram(df, x="Exam_Score", nbins=25,
-                               title="Score Distribution", color_discrete_sequence=["#4F8EF7"])
-            st.plotly_chart(fig, use_container_width=True)
+            st.plotly_chart(
+                px.histogram(df, x="Exam_Score", nbins=25,
+                             title="Score Distribution",
+                             color_discrete_sequence=["#4F8EF7"]),
+                use_container_width=True)
         with c2:
-            fig = px.scatter(df, x="Hours_Studied", y="Exam_Score",
-                             trendline="ols" if False else None,
-                             opacity=0.5, title="Hours Studied vs Exam Score",
-                             color_discrete_sequence=["#34A853"])
-            st.plotly_chart(fig, use_container_width=True)
-
+            st.plotly_chart(
+                px.scatter(df, x="Hours_Studied", y="Exam_Score", opacity=0.5,
+                           title="Hours Studied vs Exam Score",
+                           color_discrete_sequence=["#34A853"]),
+                use_container_width=True)
         if "Parental_Involvement" in df.columns:
             grp = df.groupby("Parental_Involvement")["Exam_Score"].mean().reset_index()
-            fig = px.bar(grp, x="Parental_Involvement", y="Exam_Score",
-                         title="Average Score by Parental Involvement",
-                         color="Exam_Score", color_continuous_scale="Blues")
-            st.plotly_chart(fig, use_container_width=True)
+            st.plotly_chart(
+                px.bar(grp, x="Parental_Involvement", y="Exam_Score",
+                       title="Average Score by Parental Involvement",
+                       color="Exam_Score", color_continuous_scale="Blues"),
+                use_container_width=True)
+        st.caption("🔒 Raw dataset access and model retraining are admin-only.")
 
     with tab2:
+        if not can("weak_students"):
+            st.warning("You don't have access to this feature."); return
         st.markdown("#### ⚠️ Students Needing Support (score < 60)")
         st.dataframe(
-            weak[["Hours_Studied", "Attendance", "Previous_Scores", "Exam_Score"]]
-            .head(25),
-            use_container_width=True,
-        )
+            weak[["Hours_Studied", "Attendance", "Previous_Scores", "Exam_Score"]].head(25),
+            use_container_width=True)
         c1, c2 = st.columns(2)
         with c1:
             st.markdown("##### 🏆 Top 10 Performers")
@@ -493,22 +458,50 @@ def teacher_portal(df: pd.DataFrame):
                          use_container_width=True)
 
     with tab3:
-        st.markdown("#### 🌍 SDG 4 — Quality Education Progress")
+        if not can("sdg_report"):
+            st.warning("You don't have access to this feature."); return
         pct_passing = (df["Exam_Score"] >= 60).mean() * 100
         c1, c2, c3 = st.columns(3)
         c1.metric("Students passing (≥60)", f"{pct_passing:.1f}%")
         c2.metric("Avg attendance", f"{df['Attendance'].mean():.1f}%")
         c3.metric("Avg study hours", f"{df['Hours_Studied'].mean():.1f}")
-
         st.markdown(
-            '<div class="ai-insight">'
-            f"🤖 <b>AI Insight:</b> {pct_passing:.0f}% of students currently meet "
-            "the SDG 4 quality-education threshold. Focused interventions on the "
-            f"{len(weak)} at-risk learners could lift the school's index "
-            "significantly within one term."
-            "</div>",
-            unsafe_allow_html=True,
-        )
+            f'<div class="ai-insight">🤖 <b>AI Insight:</b> {pct_passing:.0f}% of '
+            "students currently meet the SDG 4 quality-education threshold. "
+            f"Targeted interventions on the {len(weak)} at-risk learners could "
+            "lift the school's SDG 4 index significantly within one term.</div>",
+            unsafe_allow_html=True)
+
+    with tab4:
+        if not can("performance_trends"):
+            st.warning("You don't have access to this feature."); return
+        st.markdown("#### 🎯 How This Dashboard Powers Vision 2030 & 2035")
+        c1, c2 = st.columns(2)
+        with c1:
+            st.markdown(
+                '<div class="vision-card"><h4>🇸🇦 Vision 2030</h4>'
+                "<ul>"
+                f"<li><b>Knowledge economy:</b> tracking {len(df):,} learner outcomes</li>"
+                "<li><b>AI-assisted learning:</b> predictive model deployed in Student Portal</li>"
+                f"<li><b>Workforce capability:</b> {pct_passing(df):.0f}% on track to exceed proficiency</li>"
+                "</ul></div>" if False else
+                '<div class="vision-card"><h4>🇸🇦 Vision 2030</h4>'
+                "<ul>"
+                f"<li><b>Knowledge economy:</b> tracking {len(df):,} learner outcomes</li>"
+                "<li><b>AI-assisted learning:</b> predictive model deployed in Student Portal</li>"
+                f"<li><b>Workforce capability:</b> {(df['Exam_Score']>=60).mean()*100:.0f}% of students meeting proficiency</li>"
+                "</ul></div>",
+                unsafe_allow_html=True)
+        with c2:
+            st.markdown(
+                '<div class="vision-card"><h4>🚀 Vision 2035</h4>'
+                "<ul>"
+                "<li><b>AI quality assurance:</b> Random Forest classifier monitors performance bands</li>"
+                f"<li><b>Predictive analytics:</b> {len(weak)} at-risk students flagged for early support</li>"
+                "<li><b>Equitable support:</b> personalized AI recommendations for every learner</li>"
+                "<li><b>Digital transformation:</b> dataset-driven decisions replace guesswork</li>"
+                "</ul></div>",
+                unsafe_allow_html=True)
 
 
 # ---------------------------------------------------------------------------
@@ -516,24 +509,27 @@ def teacher_portal(df: pd.DataFrame):
 # ---------------------------------------------------------------------------
 def main():
     init_state()
-    df = load_data()
 
-    if df.empty:
-        st.error(
-            f"Dataset `{DATA_FILE}` not found. Place it in the project root "
-            "and reload the app."
-        )
+    if not st.session_state.logged_in:
+        login_page()
         return
 
-    portal = st.session_state.portal
-    if portal is None:
-        landing_page()
-    elif portal == "student":
+    df = load_data()
+    if df.empty:
+        render_sidebar()
+        st.error(f"Dataset `{DATA_FILE}` not found. Place it in the project root.")
+        return
+
+    render_sidebar()
+    role = st.session_state.role
+    if role == "student":
         student_portal(df)
-    elif portal == "admin":
+    elif role == "admin":
         admin_portal(df)
-    elif portal == "teacher":
+    elif role == "teacher":
         teacher_portal(df)
+    else:
+        st.error("Unknown role."); logout()
 
 
 if __name__ == "__main__":
