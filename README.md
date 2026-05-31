@@ -1,66 +1,85 @@
-# AI Student Performance Assistant 🎓
+# 🎓 AI Student Performance Assistant
 
-A beginner-friendly, menu-driven Python AI assistant that analyzes student
-performance data and provides predictions and recommendations to help improve
-learning outcomes.
+A professional, role-based **Streamlit** AI web application that helps
+students, school administrators, and platform admins use data and machine
+learning to improve learning outcomes.
 
 ## 🌍 SDG 4 — Quality Education
 
-This project supports the United Nations **Sustainable Development Goal 4:
-Quality Education**, which aims to *"ensure inclusive and equitable quality
-education and promote lifelong learning opportunities for all."*
+This project supports **UN Sustainable Development Goal 4: Quality Education**,
+which aims to *"ensure inclusive and equitable quality education and promote
+lifelong learning opportunities for all."*
 
-By using data and machine learning, the assistant helps:
-- Identify students who may be falling behind
+By combining data analytics and AI, the platform helps:
+- Identify students at risk of falling behind
 - Recommend personalized study habits
-- Show which factors (study hours, attendance, parental involvement, etc.)
-  most influence success
-- Empower students, teachers, and parents to make data-informed decisions
+- Surface which factors most influence success
+- Empower educators with school-wide insights
+
+## 🇸🇦 Vision 2030 & Vision 2035 Alignment
+
+- **Vision 2030** — Builds a knowledge-based economy by giving learners
+  AI-powered tools that personalize education and raise national learning
+  outcomes.
+- **Vision 2035** — Advances digital transformation in education through
+  data-driven decision making, predictive analytics, and AI assistants for
+  schools and policymakers.
 
 ## 📊 Dataset
 
 - **Name:** Student Performance Factors
 - **Source (Kaggle):** https://www.kaggle.com/datasets/lainguyn123/student-performance-factors
-- **File:** `StudentPerformanceFactors.csv` (included)
-- **Records:** ~6,600 students, 20 columns including study hours, attendance,
-  sleep, parental involvement, motivation, and exam scores.
+- **File:** `StudentPerformanceFactors.csv` (≈ 6,607 student records, 20 columns)
 
-## ✨ Features
+## 🧭 Role-Based Dashboards
 
-1. **View dataset summary** — rows, columns, and statistics
-2. **Show average student scores** — exam, previous, hours, attendance
-3. **Detect weak-performing students** — students below a score threshold
-4. **Predict exam score** from study hours (Linear Regression)
-5. **Personalized study recommendations** based on current score
-6. **Charts & graphs** — score distribution, study vs score, parental impact
-7. **Predict performance category** — Low / Medium / High (Random Forest)
+The app uses a clean landing page → portal flow (no cluttered sidebar):
 
-## 🛠 Tech Stack
+| Portal | For | Key Features |
+| --- | --- | --- |
+| 👩‍🎓 **Student Portal** | Students | AI score prediction, personalized recommendations, AI learning assistant |
+| 🛠️ **Admin Portal** | Platform admins | Dataset viewer, data health checks, ML model training & metrics, system info |
+| 🏫 **Teacher Portal** | Teachers / school leaders | School analytics, at-risk student detection, top/bottom performers, SDG 4 progress |
 
-- Python 3.9+
-- pandas, numpy — data analysis
-- matplotlib — visualization
-- scikit-learn — machine learning
+Each portal is fully isolated — selecting one only shows that role's tools.
 
-## 🚀 How to Run
+## 🤖 AI / ML Functionality
+
+- **Linear Regression** — predicts exam score from study hours
+- **Random Forest Classifier** — categorizes performance as Low / Medium / High
+- **Mock LMSYS / LM Arena wrapper** — `ai_insight()` in `app.py` shows where a
+  real LLM API call would be plugged in for natural-language feedback
+
+## 🚀 How to Run Locally
 
 ```bash
-# 1. Install dependencies
 pip install -r requirements.txt
-
-# 2. Make sure StudentPerformanceFactors.csv is in the same folder as app.py
-
-# 3. Run the assistant
-python app.py
+streamlit run app.py
 ```
 
-Then pick options from the menu (0 to exit).
+Then open the URL Streamlit prints (usually http://localhost:8501).
+
+Make sure `StudentPerformanceFactors.csv` is in the same folder as `app.py`.
+
+## ☁️ Deployment
+
+### Streamlit Community Cloud (recommended)
+1. Push this repo to GitHub.
+2. Go to https://share.streamlit.io and connect your repo.
+3. Set the main file to `app.py` and deploy.
+
+### Vercel
+Streamlit runs as a long-lived Python server, so deploy it with the
+[Vercel Python runtime](https://vercel.com/docs/functions/runtimes/python)
+or proxy it behind a Vercel project. For the smoothest experience use
+Streamlit Cloud, Hugging Face Spaces, or Render — all support `streamlit run`
+out of the box.
 
 ## 📁 Project Structure
 
 ```
 .
-├── app.py                          # Main assistant program
+├── app.py                          # Streamlit application
 ├── requirements.txt                # Python dependencies
 ├── README.md                       # This file
 └── StudentPerformanceFactors.csv   # Kaggle dataset
@@ -68,6 +87,6 @@ Then pick options from the menu (0 to exit).
 
 ## 💡 Notes
 
-- All inputs are validated — invalid entries show a friendly warning.
-- The code is organized into small, commented functions for easy learning.
-- Models are trained automatically when the app starts.
+- The first run trains the ML models and caches them via `st.cache_resource`.
+- All inputs are validated; invalid entries show friendly warnings.
+- The codebase is organized into small, commented functions for easy learning.
