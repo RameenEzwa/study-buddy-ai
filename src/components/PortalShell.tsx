@@ -69,7 +69,7 @@ export function PortalShell({
         </div>
         {children}
       </main>
-      <Outlet />
+      
     </div>
   );
 }
