@@ -483,13 +483,7 @@ def teacher_portal(df: pd.DataFrame):
                 "<ul>"
                 f"<li><b>Knowledge economy:</b> tracking {len(df):,} learner outcomes</li>"
                 "<li><b>AI-assisted learning:</b> predictive model deployed in Student Portal</li>"
-                f"<li><b>Workforce capability:</b> {pct_passing(df):.0f}% on track to exceed proficiency</li>"
-                "</ul></div>" if False else
-                '<div class="vision-card"><h4>🇸🇦 Vision 2030</h4>'
-                "<ul>"
-                f"<li><b>Knowledge economy:</b> tracking {len(df):,} learner outcomes</li>"
-                "<li><b>AI-assisted learning:</b> predictive model deployed in Student Portal</li>"
-                f"<li><b>Workforce capability:</b> {(df['Exam_Score']>=60).mean()*100:.0f}% of students meeting proficiency</li>"
+                f"<li><b>Workforce capability:</b> {pct_passing:.0f}% of students meeting proficiency</li>"
                 "</ul></div>",
                 unsafe_allow_html=True)
         with c2:
