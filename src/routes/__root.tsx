@@ -78,14 +78,18 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { title: "Lovable App" },
-      { name: "description", content: "Lovable Generated Project" },
+      { title: "EduAI Academic Analytics" },
+      { name: "description", content: "EduAI is an academic analytics platform that helps students, teachers, and institutions analyze performance, track progress, and generate insights through AI-po" },
       { name: "author", content: "Lovable" },
-      { property: "og:title", content: "Lovable App" },
-      { property: "og:description", content: "Lovable Generated Project" },
+      { property: "og:title", content: "EduAI Academic Analytics" },
+      { property: "og:description", content: "EduAI is an academic analytics platform that helps students, teachers, and institutions analyze performance, track progress, and generate insights through AI-po" },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },
       { name: "twitter:site", content: "@Lovable" },
+      { name: "twitter:title", content: "EduAI Academic Analytics" },
+      { name: "twitter:description", content: "EduAI is an academic analytics platform that helps students, teachers, and institutions analyze performance, track progress, and generate insights through AI-po" },
+      { property: "og:image", content: "https://storage.googleapis.com/gpt-engineer-file-uploads/G5FcuZEMzxUxGf3Ia3YKMklkEiI3/social-images/social-1780215286304-ChatGPT_Image_May_31,_2026,_01_13_38_PM.webp" },
+      { name: "twitter:image", content: "https://storage.googleapis.com/gpt-engineer-file-uploads/G5FcuZEMzxUxGf3Ia3YKMklkEiI3/social-images/social-1780215286304-ChatGPT_Image_May_31,_2026,_01_13_38_PM.webp" },
     ],
     links: [
       {
